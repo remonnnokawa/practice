@@ -41,6 +41,7 @@ max_time_diffs = 3000000
 #データ入力用にリストを作っておく
 all_time_diffs = list()
 time_diffs = list()
+#iterrows() → DataFrame を1行ずつ (index, Series) の形で返す
 for _idx1 , record_ch1 in df_ch1.iterrows():
     for _idx4 , record_ch4 in df_ch4.iterrows():
         time_diff = record_ch4['t_stop4_ps'] - record_ch1['t_stop1_ps']
@@ -57,3 +58,29 @@ for _idx1 , record_ch1 in df_ch1.iterrows():
     all_time_diffs.append(df_time_diffs)
 df_all_time_diffs = pd.concat(all_time_diffs,ignore_index= True)
 print(df_all_time_diffs.head())
+#time_diffs … dict のリスト
+
+#df_time_diffs … その dict リストを変換した DataFrame
+
+#all_time_diffs … 複数の DataFrame を一時的に溜めるリスト
+
+#pd.concat(all_time_diffs) … DataFrame のリストをまとめて 1 つの DataFrame に
+
+time_bin_psec = 10000
+
+min_time_diff = df_all_time_diffs['time_diff'].min()
+max_time_diff = df_all_time_diffs['time_diff'].max()
+#range()だと扱えるのは整数のみ、返し値はrangeオブジェクト
+#np.arrange()なら浮動小数点も使える、返し値がNumpy配列でヒストグラムにつかいやすい
+dts = np.arrange(min_time_diff, max_time_diff, time_bin_psec)
+print(f'最小: {min_time_diff}, 最大: {max_time_diff}, 幅: {time_bin_psec}')
+
+counter = {int(dt): 0 for dt in dts}
+
+for _idx , record in tqdm(df_all_time_diffs.iterrows(),total=len(df_all_time_diffs),leave = True):
+    for dt in reversed(counter.key()):
+        if record['time_diff'] >= dt:
+            #dict[key]はそのキーに対応する値を意味する
+            counter[dt] += 1
+            break
+sr_coincidence = pd.Series(counter)
