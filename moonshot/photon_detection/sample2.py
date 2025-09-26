@@ -8,7 +8,7 @@ import seaborn as sns
 import os
 from tqdm import tqdm
 #スクリプトファイルがある場所をカレントディレクトリにする
-script_dir = Path(__file__).parent
+script_dir = Path(__file__).parent" 
 os.chdir(script_dir)
 
 
