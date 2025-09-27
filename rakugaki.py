@@ -1,14 +1,32 @@
-point = int(input())
-match point:
-    case 227:
-        print(f"{point} is my birthday")
+birth_date = list(input().split())
+print(birth_date)
+match birth_date:
+    case ['daisuke_takeuchi', '2_27', *rest]:
+        print(f"あっているよ {rest}")
+    case [nobady , 6_30 ,*rest]:
+        print(f"それは捨てたろ")
     case _:
-        print("""fxxkin no way 
-I know that date""")
+        print("invalid value")
 
-points = [30,40,50,60,70]
-match points:
-    case [x,y,*rest]:
-        print(f"x = {x}, y = {y}, rest = {rest}")
-    case _:
-        pass
+
+def checkok(attempts = 4 , warning ="try again"):
+    while True:
+        reply = input()
+        if reply == "yes":
+            return True
+        if reply == "no":
+            return False
+        if attempts < 0:
+            raise ValueError("no more attempts")
+        else:
+            print(warning)
+            attempts = attempts - 1
+checkok()
+
+def f(a,L=None):
+    if L is None:
+        L = []
+    L.append(a)
+    return a
+
+f(input())
