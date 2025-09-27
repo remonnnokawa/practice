@@ -3,3 +3,5 @@ b,c = map(int,input().split())
 s = input()
 #文字列と数値両方使える"{} {}".format(○○,○○)
 print("{} {}".format(a+b+c, s))
+#これでもいい
+print(f"{a+b+c},{s}")
