@@ -7,7 +7,7 @@ def http_error(status):
             return "Not found"
         case 418:
             return "I'm a teapot"
-        #/ は or 
+        #| は or 
         case 401 | 403:
             return "Not allowed"
         #matchにおいてワイルドカード_は最後に置く
