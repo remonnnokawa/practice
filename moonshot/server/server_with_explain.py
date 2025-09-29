@@ -61,33 +61,44 @@ class RelayServerProtocol(asyncio.DatagramProtocol):
             #ink = 書き込み先（ファイル、メモリバッファ、ソケットなど）
             # schema = データの構造（列名と型の定義、例: ch: uint8, timestamp: uint32）
     def __init__(self):
-        super().__init__()
-        self.transport = None
-        self.channels = deque(maxlen=MAX_LEN)
-        self.timestamps = deque(maxlen=MAX_LEN)
-        self.num_received_bytes = 0
+        super().__init__() #継承元のクラス（ここでは asyncio.DatagramProtocol）の __init__ を呼び出しています。
+        #親クラス側で必要な初期化処理（内部状態のセットアップや属性の初期化）がある場合にそれを実行させるための呼び出しです。
+        self.transport = None#UDP の送受信用トランスポートを格納するための属性を初期化しています。
+        #connection_made が呼ばれたときに実際の asyncio.DatagramTransport オブジェクトが代入される想定
+        self.channels = deque(maxlen=MAX_LEN)#受信した「チャネル番号」を一時的にためておく collections.deque を作成しています。
+        self.timestamps = deque(maxlen=MAX_LEN)#受信した「タイムスタンプ」をためる deque です。
+        #maxlen を指定しているので、この deque は 固定長のリングバッファ のように振る舞い、要素が maxlen を超えて追加されると左端（最も古い要素）が自動的に破棄されます
+        self.num_received_bytes = 0#datagram_received 内で受信パケットごとに len(data) を足し合わせて更新されます。
         self.num_packets = 0
-        self.sink = local_fs.open_output_stream(TMP_FILE_PATH)
+        self.sink = local_fs.open_output_stream(TMP_FILE_PATH) #local_fs  =  pyarrow.fs.LocalFileSystem()
+        #open_output_stream(path) は指定パス（ここでは "/tmp/timetag_record.dat"）に書き込み用の出力ストリーム（OutputStream 相当）を作ります。
         self.writer = pa.ipc.new_stream(self.sink, schema=TimetagRecordSchema)
+        #RecordBatch IPC ストリーム書き込み用オブジェクト（一般に RecordBatchStreamWriter 相当）を作成して self.writer に保持
+        #self.sink（先ほど開いた出力ストリーム）に対して Arrow の IPC ストリームフォーマットで RecordBatch を連続して書き込めるようにする。
+        #schema=TimetagRecordSchema には pyarrow.Schema（列の名前と型を定義したオブジェクト）が渡されている想定で、これが書き込む RecordBatch のスキーマになる
+        #つまりTimetagRecordSchema自体になにか代入されるものに対してデータの種類を宣言しているわけではない
+    def connection_made(self, transport):#asyncio.DatagramProtocol のコールバックメソッド
+        #ソケットが生成されて実際の「トランスポート（送受信を司るオブジェクト）」が用意されると asyncio がこのメソッドを呼び出します。
+        self.transport = transport #transport はasyncioが渡してくるインスタンス
+        #インスタンス変数に保存することでのちのち使えるようになる
 
-    def connection_made(self, transport):
-        self.transport = transport
-
-    def datagram_received(self, data, addr):
-        num_bytes = len(data)
-        self.num_packets += 1
-        print("Received:", num_bytes, "bytes from", addr)
-        for i in range(0, num_bytes, 4):
-            record = int.from_bytes(data[i : i + 4], byteorder="little")
-            ch = record >> 27
-            timestamp = record & 0x7FFFFFF
+    def datagram_received(self, data, addr):#UDPデータグラムを受信したときに asyncio が呼ぶコールバックです
+        #data は受信ペイロード（bytes) ,addr は送信元アドレス（通常は (ip, port) のタプル）
+        num_bytes = len(data)#受信バイト列の長さを取得して num_bytes に格納
+        self.num_packets += 1#受信した UDP パケットの総数をカウントアップ
+        print("Received:", num_bytes, "bytes from", addr)#受信通知をコンソールに出力
+        for i in range(0, num_bytes, 4):#受信データを 4バイト（32ビット）ずつ に分割して処理するためのループ　送信側は1レコード=4バイトで送ってきている前提のコード
+            record = int.from_bytes(data[i : i + 4], byteorder="little")#スライス data[i:i+4]（bytes）を整数に変換します。リトルエンディアン（最下位バイトが先）で解釈することを意味
+            ch = record >> 27#record（最大32ビット想定）を右に27ビットシフトすることで、上位5ビット（32 − 27 = 5 ビット）を取り出します
+            timestamp = record & 0x7FFFFFF #&はビット単位の AND を取る演算子です。各ビットを比較して 両方が1のときだけ1 になります。
+            #record の 下位27ビットだけ残して、上位ビットは全部0にする ことができる
             print(
                 f"ch: {ch:2d}, timestamp: {timestamp:9d} | data: {record:32b} | {record:8x}"
             )
-            self.channels.append(ch)
-            self.timestamps.append(timestamp)
+            self.channels.append(ch)#チャンネル値を追加
+            self.timestamps.append(timestamp)#タイムスタンプ値を timestamps バッファへ追加
             if self.channels.maxlen == len(self.channels):
-                self.write_stream()
+                self.write_stream() #len(self.channels) == maxlen）になったら write_stream() を呼んでバッファをフラッシュ（RecordBatch にしてファイルへ書き出す）
 
         self.num_received_bytes += num_bytes
 
